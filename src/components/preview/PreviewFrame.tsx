@@ -12,21 +12,24 @@ export function PreviewFrame() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { getAllFiles, refreshTrigger } = useFileSystem();
   const [error, setError] = useState<string | null>(null);
-  const [entryPoint, setEntryPoint] = useState<string>("/App.jsx");
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const entryPointRef = useRef<string>("/App.jsx");
+  const isFirstLoadRef = useRef(true);
 
   useEffect(() => {
     const updatePreview = () => {
       try {
         const files = getAllFiles();
 
-        // Clear error first when we have files
-        if (files.size > 0 && error) {
-          setError(null);
+        if (files.size === 0) {
+          setError(isFirstLoadRef.current ? "firstLoad" : "No files to preview");
+          return;
         }
 
+        // We have files, so it's no longer the first load
+        isFirstLoadRef.current = false;
+
         // Find the entry point - look for App.jsx, App.tsx, index.jsx, or index.tsx
-        let foundEntryPoint = entryPoint;
+        let foundEntryPoint = entryPointRef.current;
         const possibleEntries = [
           "/App.jsx",
           "/App.tsx",
@@ -36,35 +39,21 @@ export function PreviewFrame() {
           "/src/App.tsx",
         ];
 
-        if (!files.has(entryPoint)) {
+        if (!files.has(entryPointRef.current)) {
           const found = possibleEntries.find((path) => files.has(path));
           if (found) {
             foundEntryPoint = found;
-            setEntryPoint(found);
-          } else if (files.size > 0) {
+            entryPointRef.current = found;
+          } else {
             // Just use the first .jsx/.tsx file found
             const firstJSX = Array.from(files.keys()).find(
               (path) => path.endsWith(".jsx") || path.endsWith(".tsx")
             );
             if (firstJSX) {
               foundEntryPoint = firstJSX;
-              setEntryPoint(firstJSX);
+              entryPointRef.current = firstJSX;
             }
           }
-        }
-
-        if (files.size === 0) {
-          if (isFirstLoad) {
-            setError("firstLoad");
-          } else {
-            setError("No files to preview");
-          }
-          return;
-        }
-
-        // We have files, so it's no longer the first load
-        if (isFirstLoad) {
-          setIsFirstLoad(false);
         }
 
         if (!foundEntryPoint || !files.has(foundEntryPoint)) {
@@ -96,7 +85,7 @@ export function PreviewFrame() {
     };
 
     updatePreview();
-  }, [refreshTrigger, getAllFiles, entryPoint, error, isFirstLoad]);
+  }, [refreshTrigger, getAllFiles]);
 
   if (error) {
     if (error === "firstLoad") {
